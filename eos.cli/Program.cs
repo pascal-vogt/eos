@@ -49,7 +49,7 @@
         {
             var config = await Configuration.Load();
             var vertec = new VertecInterface(config);
-            
+
             DateTime? from = null;
             if (o.From != null)
             {

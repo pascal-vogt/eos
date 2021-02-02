@@ -2,7 +2,6 @@
 {
     public class VertecEntry
     {
-        public int VertecID { get; set; }
         public string Project { get; set; }
         public string Phase { get; set; }
         public string Date { get; set; }

@@ -124,7 +124,7 @@
             var rangeStart = new DateTime(year, month, 1);
             var rangeEnd = new DateTime(rangeStart.Year, rangeStart.Month, DateTime.DaysInMonth(rangeStart.Year, rangeStart.Month));
             var entries = await GetEntries(rangeStart, rangeEnd);
-            entries = entries.OrderBy(o => o.Date).ThenBy(o => o.VertecID).ToList();
+            entries = entries.OrderBy(o => o.Date).ThenBy(o => o.CreaDate).ToList();
             var jsonString = JsonSerializer.Serialize(entries, new JsonSerializerOptions
             {  
                 WriteIndented = true
@@ -311,9 +311,6 @@
                     
                     switch (propertyTag.Name)
                     {
-                        case "objid":
-                            entry.VertecID = int.Parse(propertyTag.InnerText);
-                            break;
                         case "datum":
                             entry.Date = propertyTag.InnerText; // yyyy-MM-dd format
                             break;

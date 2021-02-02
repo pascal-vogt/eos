@@ -16,24 +16,20 @@
 
     public class VertecInterface
     {
-        private readonly string _baseUrl;
-        private readonly string _userName;
-        private readonly string _cacheLocation;
+        private readonly Configuration _configuration;
         private string _jsonWebToken;
         private readonly HttpClient _httpClient;
         
         public VertecInterface(Configuration configuration)
         {
-            this._baseUrl = configuration.VertecURL;
-            this._userName = configuration.VertecUser;
-            this._cacheLocation = configuration.VertecCacheLocation;
+            this._configuration = configuration;
             this._httpClient = new HttpClient();
         }
 
         private async Task Login()
         {
             var pass = new StringBuilder();
-            Console.Write($"Vertec password for {this._userName}:");
+            Console.Write($"Vertec password for {this._configuration.VertecUser}:");
             ConsoleKeyInfo key;
 
             do 
@@ -55,9 +51,9 @@
             while (key.Key != ConsoleKey.Enter);
             Console.WriteLine();
 
-            var userNameUrlEncoded = HttpUtility.UrlEncode(this._userName);
+            var userNameUrlEncoded = HttpUtility.UrlEncode(this._configuration.VertecUser);
             var passwordUrlEncoded = HttpUtility.UrlEncode(pass.ToString());
-            var result = await this._httpClient.PostAsync($"{this._baseUrl}/auth/xml",
+            var result = await this._httpClient.PostAsync($"{this._configuration.VertecURL}/auth/xml",
                 new StringContent($"vertec_username={userNameUrlEncoded}&password={passwordUrlEncoded}",
                     Encoding.UTF8));
             this._jsonWebToken = await result.Content.ReadAsStringAsync();
@@ -65,24 +61,24 @@
 
         private string GetWorkLogCacheFileLocation(int year, int month)
         {
-            return Path.Join(_cacheLocation, $"work-logs-{year.ToString("D4")}-{month.ToString("D2")}.json");
+            return Path.Join(this._configuration.VertecCacheLocation, $"work-logs-{year.ToString("D4")}-{month.ToString("D2")}.json");
         }
         
         private string GetHolidayCacheFileLocation()
         {
-            return Path.Join(_cacheLocation, $"holidays.json");
+            return Path.Join(this._configuration.VertecCacheLocation, $"holidays.json");
         }
         
         private string GetFirstWorkDayFileLocation()
         {
-            return Path.Join(_cacheLocation, $"first-work-day.json");
+            return Path.Join(this._configuration.VertecCacheLocation, $"first-work-day.json");
         }
         
         private Tuple<DateTime, DateTime> GetMinMaxRange()
         {
             DateTime? min = null;
             DateTime? max = null;
-            Directory.GetFiles(this._cacheLocation)
+            Directory.GetFiles(this._configuration.VertecCacheLocation)
                 .Select(f => Path.GetFileName(f))
                 .Where(f => f.StartsWith("work-logs-"))
                 .Select(f => Regex.Split(f, @"[-\.]"))
@@ -200,7 +196,7 @@
                 }
             };
             
-            var result = await this._httpClient.PostAsync($"{this._baseUrl}/xml",
+            var result = await this._httpClient.PostAsync($"{this._configuration.VertecURL}/xml",
                 new StringContent(request.ToString(), Encoding.UTF8));
 
             var xmlOut = await result.Content.ReadAsStringAsync();
@@ -261,7 +257,7 @@
             var request = new VertecRequest
             {
                 Token = this._jsonWebToken,
-                Ocl = $"projektBearbeiter->select(loginName = '{this._userName}').{collectionName}->select({timeRestriction})",
+                Ocl = $"projektBearbeiter->select(loginName = '{this._configuration.VertecUser}').{collectionName}->select({timeRestriction})",
                 Members = new[]
                 {
                     "datum",
@@ -276,7 +272,7 @@
                 }
             };
 
-            var result = await this._httpClient.PostAsync($"{this._baseUrl}/xml",
+            var result = await this._httpClient.PostAsync($"{this._configuration.VertecURL}/xml",
                 new StringContent(request.ToString(), Encoding.UTF8));
             
             var xmlOut = await result.Content.ReadAsStringAsync();
@@ -352,7 +348,7 @@
             var request = new VertecRequest
             {
                 Token = this._jsonWebToken,
-                Ocl = $"projektBearbeiter->select(loginName = '{this._userName}')",
+                Ocl = $"projektBearbeiter->select(loginName = '{this._configuration.VertecUser}')",
                 Members = new[]
                 {
                     "eintrittPer"
@@ -362,7 +358,7 @@
                 }
             };
 
-            var result = await this._httpClient.PostAsync($"{this._baseUrl}/xml",
+            var result = await this._httpClient.PostAsync($"{this._configuration.VertecURL}/xml",
                 new StringContent(request.ToString(), Encoding.UTF8));
             
             var xmlOut = await result.Content.ReadAsStringAsync();
@@ -497,6 +493,46 @@
             }
         }
 
+        private string GetAggregationKey(VertecEntry entry)
+        {
+            // default to project name
+            if (this._configuration.VertecAggregationConfig == null)
+            {
+                return entry.Project;
+            }
+            
+            // config is available
+            foreach (var item in this._configuration.VertecAggregationConfig)
+            {
+                string value = null;
+                foreach (var key in item.Key.Split(","))
+                {
+                    switch (key)
+                    {
+                        case "Project":
+                            value = entry.Project;
+                            break;
+                        case "Phase":
+                            value = entry.Phase;
+                            break;
+                        case "Description":
+                            value = entry.Description;
+                            break;
+                        default:
+                            throw new ArgumentException(item.Key);
+                    }
+
+                    var regex = new Regex(item.Match, RegexOptions.Compiled | RegexOptions.IgnoreCase);
+                    if (regex.IsMatch(value))
+                    {
+                        return regex.Replace(value, item.Replacement);
+                    }
+                }
+            }
+
+            return "?";
+        }
+
         public async Task Aggregate(string textFilter, DateTime? from, DateTime? to)
         {
             var filteredEntries = await FilterEntries(textFilter, from, to);
@@ -504,11 +540,12 @@
             var amountPerProject = new Dictionary<string, decimal>();
             filteredEntries.ForEach(entry =>
             {
+                var aggregationKey = this.GetAggregationKey(entry);
                 totalAmount += entry.Hours;
                 var sumSoFar = 0m;
-                amountPerProject.TryGetValue(entry.Project, out sumSoFar);
+                amountPerProject.TryGetValue(aggregationKey, out sumSoFar);
                 sumSoFar += entry.Hours;
-                amountPerProject[entry.Project] = sumSoFar;
+                amountPerProject[aggregationKey] = sumSoFar;
             });
             Console.WriteLine("Per project:");
             foreach (var project in amountPerProject.Keys.OrderBy(s => s))

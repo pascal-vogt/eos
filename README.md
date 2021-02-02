@@ -37,6 +37,29 @@ eos vertec --list --to 10.01.2021
 eos vertec --aggregate --from 10.01.2021
 ```
 
+The default aggregation key is the project name, but it can be changed using `eos.config`:
+```
+{
+  "VertecAggregationConfig": [
+    {
+      "Key": "Project,Phase,Description",
+      "Match": "^.*(EOS |EOS-).*$",
+      "Replacement": "EOS"
+    },
+    {
+      "Key": "Project,Description",
+      "Match": "^.*(HOLIDAYS).*$",
+      "Replacement": "HOLIDAYS"
+    },
+    {
+      "Key": "Project",
+      "Match": "^.*$",
+      "Replacement": "$0"
+    }
+  ]
+}
+```
+
 You can view your overtime:
 ```
 eos vertec --overtime

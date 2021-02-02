@@ -1,10 +1,20 @@
 ﻿namespace eos.core.configuration
 {
     using System;
+    using System.Collections.Generic;
     using System.IO;
     using System.Text;
     using System.Text.Json;
     using System.Threading.Tasks;
+    
+    public class VertecAggregationConfigItem
+    {
+        public string Key { get; set; }
+        
+        public string Match { get; set; }
+        
+        public string Replacement { get; set; }
+    }
 
     public class Configuration
     {
@@ -13,6 +23,8 @@
         public string VertecUser { get; set; }
 
         public string VertecCacheLocation { get; set; }
+        
+        public List<VertecAggregationConfigItem> VertecAggregationConfig { get; set; }
 
         public static string GetConfigFilePath()
         {

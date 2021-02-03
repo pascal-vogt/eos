@@ -19,11 +19,29 @@
         private readonly Configuration _configuration;
         private string _jsonWebToken;
         private readonly HttpClient _httpClient;
+        private readonly Dictionary<string, Regex> _regexCache;
         
         public VertecInterface(Configuration configuration)
         {
             this._configuration = configuration;
             this._httpClient = new HttpClient();
+            this._regexCache = this.BuildRegexCache(configuration);
+        }
+
+        private Dictionary<string, Regex> BuildRegexCache(Configuration configuration)
+        {
+            var cache = new Dictionary<string, Regex>();
+            if (configuration.VertecAggregationConfig != null)
+            {
+                foreach (var configItem in configuration.VertecAggregationConfig)
+                {
+                    if (!cache.ContainsKey(configItem.Match))
+                    {
+                        cache.Add(configItem.Match, new Regex(configItem.Match, RegexOptions.Compiled | RegexOptions.IgnoreCase));
+                    }
+                }
+            }
+            return cache;
         }
 
         private async Task Login()
@@ -500,7 +518,7 @@
             {
                 return entry.Project;
             }
-            
+
             // config is available
             foreach (var item in this._configuration.VertecAggregationConfig)
             {
@@ -522,7 +540,7 @@
                             throw new ArgumentException(item.Key);
                     }
 
-                    var regex = new Regex(item.Match, RegexOptions.Compiled | RegexOptions.IgnoreCase);
+                    var regex = this._regexCache[item.Match];
                     if (regex.IsMatch(value))
                     {
                         return regex.Replace(value, item.Replacement);

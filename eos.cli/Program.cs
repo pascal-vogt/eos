@@ -70,11 +70,11 @@
             {
                 VertecInterface.ParseMonth(o.CachedMonthToUpdate, out var year, out var month);
 
-                await vertec.UpdateWorkLogCache(year, month);
+                await vertec.UpdateMonth(year, month);
             }
             else if (o.List)
             {
-                await vertec.ListEntries(o.Text, from, to);
+                await vertec.ListWorkLogEntries(o.Text, from, to);
             }
             else if (o.Aggregate)
             {
@@ -88,6 +88,10 @@
             {
                 DateTime? at = VertecInterface.ParseDay(o.OvertimeAt);
                 await vertec.Overtime(at);
+            }
+            else if (o.CheckPresence)
+            {
+                await vertec.CheckPresence(from, to);
             }
         }
     }

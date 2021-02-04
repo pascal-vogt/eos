@@ -3,28 +3,33 @@
     using System;
     using System.Collections.Generic;
     using System.Globalization;
-    using System.IO;
     using System.Linq;
-    using System.Net.Http;
-    using System.Text;
-    using System.Text.Json;
     using System.Text.RegularExpressions;
     using System.Threading.Tasks;
-    using System.Web;
-    using System.Xml;
+    using cache.holidays;
+    using cache.presence;
+    using cache.userinfo;
+    using cache.worklog;
     using configuration;
+    using requests;
 
     public class VertecInterface
     {
         private readonly Configuration _configuration;
-        private string _jsonWebToken;
-        private readonly HttpClient _httpClient;
         private readonly Dictionary<string, Regex> _regexCache;
-        
+        private readonly WorkLogCacheManager _workLogCacheManager;
+        private readonly HolidayEntryCacheManager _holidayEntryCacheManager;
+        private readonly UserInfoCacheManager _userInfoCacheManager;
+        private readonly PresenceCacheManager _presenceCacheManager;
+
         public VertecInterface(Configuration configuration)
         {
             this._configuration = configuration;
-            this._httpClient = new HttpClient();
+            var vertecRequestManager = new VertecRequestsManager(configuration);
+            this._workLogCacheManager = new WorkLogCacheManager(configuration, vertecRequestManager);
+            this._holidayEntryCacheManager = new HolidayEntryCacheManager(configuration, vertecRequestManager);
+            this._userInfoCacheManager = new UserInfoCacheManager(configuration, vertecRequestManager);
+            this._presenceCacheManager = new PresenceCacheManager(configuration, vertecRequestManager);
             this._regexCache = this.BuildRegexCache(configuration);
         }
 
@@ -44,376 +49,25 @@
             return cache;
         }
 
-        private async Task Login()
+        public async Task UpdateMonth(int year, int month)
         {
-            var pass = new StringBuilder();
-            Console.Write($"Vertec password for {this._configuration.VertecUser}:");
-            ConsoleKeyInfo key;
-
-            do 
+            await this._workLogCacheManager.ForceReCache(new WorkLogCacheKey
             {
-                key = Console.ReadKey(true);
-                
-                if (!char.IsControl(key.KeyChar)) 
-                {
-                    pass.Append(key.KeyChar);
-                } 
-                else 
-                {
-                    if (key.Key == ConsoleKey.Backspace && pass.Length > 0) 
-                    {
-                        pass.Remove(pass.Length - 1, 1);
-                    }
-                }
-            }
-            while (key.Key != ConsoleKey.Enter);
-            Console.WriteLine();
-
-            var userNameUrlEncoded = HttpUtility.UrlEncode(this._configuration.VertecUser);
-            var passwordUrlEncoded = HttpUtility.UrlEncode(pass.ToString());
-            var result = await this._httpClient.PostAsync($"{this._configuration.VertecURL}/auth/xml",
-                new StringContent($"vertec_username={userNameUrlEncoded}&password={passwordUrlEncoded}",
-                    Encoding.UTF8));
-            this._jsonWebToken = await result.Content.ReadAsStringAsync();
-        }
-
-        private string GetWorkLogCacheFileLocation(int year, int month)
-        {
-            return Path.Join(this._configuration.VertecCacheLocation, $"work-logs-{year.ToString("D4")}-{month.ToString("D2")}.json");
-        }
-        
-        private string GetHolidayCacheFileLocation()
-        {
-            return Path.Join(this._configuration.VertecCacheLocation, $"holidays.json");
-        }
-        
-        private string GetFirstWorkDayFileLocation()
-        {
-            return Path.Join(this._configuration.VertecCacheLocation, $"first-work-day.json");
-        }
-        
-        private Tuple<DateTime, DateTime> GetMinMaxRange()
-        {
-            DateTime? min = null;
-            DateTime? max = null;
-            Directory.GetFiles(this._configuration.VertecCacheLocation)
-                .Select(f => Path.GetFileName(f))
-                .Where(f => f.StartsWith("work-logs-"))
-                .Select(f => Regex.Split(f, @"[-\.]"))
-                .Select(p => new DateTime(int.Parse(p[2]), int.Parse(p[3]), 1))
-                .ToList()
-                .ForEach(date =>
-                {
-                    if (!min.HasValue || min.Value > date)
-                    {
-                        min = date;
-                    }
-                    if (!max.HasValue || max.Value < date)
-                    {
-                        max = new DateTime(date.Year, date.Month, DateTime.DaysInMonth(date.Year, date.Month));
-                    }
-                });
-
-            if (!max.HasValue || !min.HasValue)
-            {
-                throw new Exception("no min-max range found");
-            }
-            return new Tuple<DateTime, DateTime>(min.Value, max.Value);
-        }
-
-        private bool HasWorkLogCache(int year, int month)
-        {
-            var location = GetWorkLogCacheFileLocation(year, month);
-            return File.Exists(location);
-        }
-        
-        private bool HasHolidayCache()
-        {
-            var location = GetHolidayCacheFileLocation();
-            return File.Exists(location);
-        }
-
-        public async Task UpdateWorkLogCache(int year, int month)
-        {
-            var rangeStart = new DateTime(year, month, 1);
-            var rangeEnd = new DateTime(rangeStart.Year, rangeStart.Month, DateTime.DaysInMonth(rangeStart.Year, rangeStart.Month));
-            var entries = await GetEntries(rangeStart, rangeEnd);
-            entries = entries.OrderBy(o => o.Date).ThenBy(o => o.CreaDate).ToList();
-            var jsonString = JsonSerializer.Serialize(entries, new JsonSerializerOptions
-            {  
-                WriteIndented = true
+                Year = year,
+                Month = month
             });
-            await File.WriteAllTextAsync(GetWorkLogCacheFileLocation(year, month), jsonString);
-        }
-
-        private async Task UpdateHolidayCache()
-        {
-            var entries = await GetHolidays();
-            entries = entries.OrderBy(o => o.FromDate).ThenBy(o => o.ToDate).ToList();
-            var jsonString = JsonSerializer.Serialize(entries, new JsonSerializerOptions
-            {  
-                WriteIndented = true
+            await this._presenceCacheManager.ForceReCache(new PresenceCacheKey
+            {
+                Year = year,
+                Month = month
             });
-            await File.WriteAllTextAsync(GetHolidayCacheFileLocation(), jsonString);
-        }
-
-        private async Task<List<VertecEntry>> LoadWorkLogCache(int year, int month)
-        {
-            if (!HasWorkLogCache(year, month))
-            {
-                return new List<VertecEntry>();
-            }
-            
-            var text = await File.ReadAllTextAsync(GetWorkLogCacheFileLocation(year, month));
-            return JsonSerializer.Deserialize<List<VertecEntry>>(text);
-        }
-
-        private async Task<List<Holiday>> LoadHolidayCache()
-        {
-            if (!HasHolidayCache())
-            {
-                return new List<Holiday>();
-            }
-            
-            var text = await File.ReadAllTextAsync(GetHolidayCacheFileLocation());
-            return JsonSerializer.Deserialize<List<Holiday>>(text);
-        }
-
-        private async Task<List<VertecEntry>> GetEntries(DateTime rangeStart, DateTime rangeEnd)
-        {
-            var entries = new List<VertecEntry>();
-            entries.AddRange(await this.GetEntriesInternal("offeneLeistungen", rangeStart, rangeEnd));
-            entries.AddRange(await this.GetEntriesInternal("verrechneteLeistungen", rangeStart, rangeEnd));
-            return entries;
-        }
-
-        private static string RemoveIllegalXmlCharacters(string xml)
-        {
-            return Regex.Replace(xml, "[\x00-\x08\x0B\x0C\x0E-\x1F]", string.Empty, RegexOptions.Compiled);
-        }
-
-        private async Task<List<Holiday>> GetHolidays()
-        {
-            if (this._jsonWebToken == null)
-            {
-                await this.Login();
-            }
-            
-            var request = new VertecRequest
-            {
-                Token = this._jsonWebToken,
-                Ocl = $"abwesenheit",
-                Members = new[]
-                {
-                    "datum",
-                    "bisDatum",
-                    "beschreibung"
-                },
-                Expressions = new KeyValuePair<string, string>[]
-                {
-                }
-            };
-            
-            var result = await this._httpClient.PostAsync($"{this._configuration.VertecURL}/xml",
-                new StringContent(request.ToString(), Encoding.UTF8));
-
-            var xmlOut = await result.Content.ReadAsStringAsync();
-            
-            // this shouldn't be necessary but i've seen Vertec produce illegal XML characters and filtering them out
-            // seems to be the easiest way to deal with this problem considering we cannot change their source code
-            xmlOut = RemoveIllegalXmlCharacters(xmlOut);
-
-            var xmlDoc= new XmlDocument();
-            try
-            {
-                xmlDoc.Load(new MemoryStream(Encoding.UTF8.GetBytes(xmlOut)));
-            }
-            catch (Exception e)
-            {
-                Console.WriteLine(xmlOut);
-                throw;
-            }
-            
-            var entries = new List<Holiday>();
-            foreach (XmlElement leistung in xmlDoc.DocumentElement.ChildNodes[0].ChildNodes[0].ChildNodes)
-            {
-                var entry = new Holiday();
-                entries.Add(entry);
-                foreach (XmlNode node in leistung.ChildNodes)
-                {
-                    var propertyTag = node as XmlElement;
-                    if (propertyTag == null)
-                    {
-                        continue;
-                    }
-                    
-                    switch (propertyTag.Name)
-                    {
-                        case "datum":
-                            entry.FromDate = propertyTag.InnerText; // yyyy-MM-dd format
-                            break;
-                        case "bisDatum":
-                            entry.ToDate = propertyTag.InnerText; // yyyy-MM-dd format
-                            break;
-                        case "beschreibung":
-                            entry.Name = propertyTag.InnerText;
-                            break;
-                    }
-                }
-            }
-            
-            return entries;
-        }
-
-        private async Task<List<VertecEntry>> GetEntriesInternal(string collectionName, DateTime rangeStart, DateTime rangeEnd)
-        {
-            if (this._jsonWebToken == null)
-            {
-                await this.Login();
-            }
-            var timeRestriction = $"(datum >= encodeDate({rangeStart.Year},{rangeStart.Month},{rangeStart.Day})) and (datum <= encodeDate({rangeEnd.Year},{rangeEnd.Month},{rangeEnd.Day}))";
-            var request = new VertecRequest
-            {
-                Token = this._jsonWebToken,
-                Ocl = $"projektBearbeiter->select(loginName = '{this._configuration.VertecUser}').{collectionName}->select({timeRestriction})",
-                Members = new[]
-                {
-                    "datum",
-                    "text",
-                    "minutenint",
-                    "creationDateTime"
-                },
-                Expressions = new []
-                {
-                    new KeyValuePair<string, string>("projekt", "projekt.code"),
-                    new KeyValuePair<string, string>("phase", "phase.code")
-                }
-            };
-
-            var result = await this._httpClient.PostAsync($"{this._configuration.VertecURL}/xml",
-                new StringContent(request.ToString(), Encoding.UTF8));
-            
-            var xmlOut = await result.Content.ReadAsStringAsync();
-
-            // this shouldn't be necessary but i've seen Vertec produce illegal XML characters and filtering them out
-            // seems to be the easiest way to deal with this problem considering we cannot change their source code
-            xmlOut = RemoveIllegalXmlCharacters(xmlOut);
-
-            var xmlDoc= new XmlDocument();
-            try
-            {
-                xmlDoc.Load(new MemoryStream(Encoding.UTF8.GetBytes(xmlOut)));
-            }
-            catch (Exception e)
-            {
-                Console.WriteLine(xmlOut);
-                throw;
-            }
-
-            var entries = new List<VertecEntry>();
-            foreach (XmlElement leistung in xmlDoc.DocumentElement.ChildNodes[0].ChildNodes[0].ChildNodes)
-            {
-                var entry = new VertecEntry();
-                entries.Add(entry);
-                foreach (XmlNode node in leistung.ChildNodes)
-                {
-                    var propertyTag = node as XmlElement;
-                    if (propertyTag == null)
-                    {
-                        continue;
-                    }
-                    
-                    switch (propertyTag.Name)
-                    {
-                        case "datum":
-                            entry.Date = propertyTag.InnerText; // yyyy-MM-dd format
-                            break;
-                        case "minutenInt":
-                            entry.Hours = int.Parse(propertyTag.InnerText) / 60m;
-                            break;
-                        case "text":
-                            entry.Description = propertyTag.InnerText;
-                            break;
-                        case "projekt":
-                            entry.Project = propertyTag.InnerText;
-                            break;
-                        case "phase":
-                            entry.Phase = propertyTag.InnerText;
-                            break;
-                        case "creationDateTime":
-                            entry.CreaDate= propertyTag.InnerText;
-                            break;
-                    }
-                }
-            }
-            
-            return entries;
-        }
-
-        private async Task<string> GetUserFirstWorkDay()
-        {
-            var text = await File.ReadAllTextAsync(GetFirstWorkDayFileLocation());
-            return JsonSerializer.Deserialize<string>(text);
-        }
-        
-        public async Task CacheUserFirstWorkDay()
-        {
-            if (this._jsonWebToken == null)
-            {
-                await this.Login();
-            }
-
-            var request = new VertecRequest
-            {
-                Token = this._jsonWebToken,
-                Ocl = $"projektBearbeiter->select(loginName = '{this._configuration.VertecUser}')",
-                Members = new[]
-                {
-                    "eintrittPer"
-                },
-                Expressions = new KeyValuePair<string, string>[]
-                {
-                }
-            };
-
-            var result = await this._httpClient.PostAsync($"{this._configuration.VertecURL}/xml",
-                new StringContent(request.ToString(), Encoding.UTF8));
-            
-            var xmlOut = await result.Content.ReadAsStringAsync();
-
-            var xmlDoc= new XmlDocument();
-            xmlDoc.Load(new MemoryStream(Encoding.UTF8.GetBytes(xmlOut)));
-            
-            foreach (XmlElement projektBearbeiter in xmlDoc.DocumentElement.ChildNodes[0].ChildNodes[0].ChildNodes)
-            {
-                foreach (XmlNode node in projektBearbeiter.ChildNodes)
-                {
-                    var propertyTag = node as XmlElement;
-                    if (propertyTag == null)
-                    {
-                        continue;
-                    }
-                    
-                    switch (propertyTag.Name)
-                    {
-                        case "eintrittPer":
-                            var dateComponents = propertyTag.InnerText;
-                            var jsonString = JsonSerializer.Serialize(dateComponents, new JsonSerializerOptions
-                            {  
-                                WriteIndented = true
-                            });
-                            await File.WriteAllTextAsync(GetFirstWorkDayFileLocation(), jsonString);
-                            break;
-                    }
-                }
-            }
         }
 
         public async Task InitCache()
         {
-            await UpdateHolidayCache();
-            await CacheUserFirstWorkDay();
-            var firstWorkDay = ParseDay(await GetUserFirstWorkDay());
+            await _holidayEntryCacheManager.GetData();
+            var userInfo = await _userInfoCacheManager.GetData();
+            var firstWorkDay = ParseDay(userInfo.FirstWorkDay);
             var now = DateTime.Today;
             var rangeStart = new DateTime(firstWorkDay.Year, firstWorkDay.Month, 1);
             while (true)
@@ -424,26 +78,23 @@
                     break;
                 }
 
-                if (!this.HasWorkLogCache(rangeStart.Year, rangeStart.Month))
-                {
-                    Console.WriteLine($"Caching {rangeStart.Month.ToString("D2")}.{rangeStart.Year}");
-                    await this.UpdateWorkLogCache(rangeStart.Year, rangeStart.Month);
-                }
+                await this._workLogCacheManager.GetData(new WorkLogCacheKey(rangeStart));
+                await this._presenceCacheManager.GetData(new PresenceCacheKey(rangeStart));
 
                 rangeStart = rangeStart.AddMonths(1);
             }
         }
-
-        private async Task<List<VertecEntry>> LoadCacheInRange(DateTime? from, DateTime? to)
+        
+        private async Task<List<Presence>> LoadPresenceCacheInRange(DateTime? from, DateTime? to)
         {
             if (!from.HasValue || !to.HasValue)
             {
-                var (min, max) = GetMinMaxRange();
+                var (min, max) = _presenceCacheManager.GetMinMaxRange();
                 from ??= min;
                 to ??= max;
             }
             
-            var results = new List<VertecEntry>();
+            var results = new List<Presence>();
             var year = from.Value.Year;
             var month = from.Value.Month;
             while (true)
@@ -453,13 +104,53 @@
                     break;
                 }
 
-                results.AddRange(await LoadWorkLogCache(year, month));
+                results.AddRange(await _presenceCacheManager.GetData(new PresenceCacheKey
+                {
+                    Year = year,
+                    Month = month
+                }));
 
                 ++month;
                 if (month > 12)
                 {
                     ++year;
-                    month = 0;
+                    month = 1;
+                }
+            }
+
+            return results;
+        }
+
+        private async Task<List<WorkLogEntry>> LoadWorkLogCacheInRange(DateTime? from, DateTime? to)
+        {
+            if (!from.HasValue || !to.HasValue)
+            {
+                var (min, max) = _workLogCacheManager.GetMinMaxRange();
+                from ??= min;
+                to ??= max;
+            }
+            
+            var results = new List<WorkLogEntry>();
+            var year = from.Value.Year;
+            var month = from.Value.Month;
+            while (true)
+            {
+                if (year > to.Value.Year || (year == to.Value.Year && month > to.Value.Month))
+                {
+                    break;
+                }
+
+                results.AddRange(await _workLogCacheManager.GetData(new WorkLogCacheKey
+                {
+                    Year = year,
+                    Month = month
+                }));
+
+                ++month;
+                if (month > 12)
+                {
+                    ++year;
+                    month = 1;
                 }
             }
 
@@ -470,10 +161,32 @@
         {
             return dateTime.HasValue ? $"{dateTime.Value.Year:D4}-{dateTime.Value.Month:D2}-{dateTime.Value.Day:D2}" : null;
         }
-
-        private async Task<List<VertecEntry>> FilterEntries(string textFilter, DateTime? from, DateTime? to)
+        
+        private async Task<List<Presence>> FilterPresenceEntries(DateTime? from, DateTime? to)
         {
-            var unfiltered = await LoadCacheInRange(from, to);
+            var unfiltered = await LoadPresenceCacheInRange(from, to);
+            var fromFormatted = FormatDay(from);
+            var toFormatted = FormatDay(to);
+            
+            return unfiltered.Where(entry =>
+            {
+                if (fromFormatted != null && string.Compare(fromFormatted, entry.From, StringComparison.InvariantCulture) > 0)
+                {
+                    return false;
+                }
+                
+                if (toFormatted != null && string.Compare(toFormatted, entry.From, StringComparison.InvariantCulture) < 0)
+                {
+                    return false;
+                }
+
+                return true;
+            }).ToList();
+        }
+
+        private async Task<List<WorkLogEntry>> FilterWorkLogEntries(string textFilter, DateTime? from, DateTime? to)
+        {
+            var unfiltered = await LoadWorkLogCacheInRange(from, to);
             var fromFormatted = FormatDay(from);
             var toFormatted = FormatDay(to);
             
@@ -502,16 +215,55 @@
             }).ToList();
         }
 
-        public async Task ListEntries(string textFilter, DateTime? from, DateTime? to)
+        public async Task CheckPresence(DateTime? from, DateTime? to)
         {
-            var filteredEntries = await FilterEntries(textFilter, from, to);
+            Console.WriteLine("Checking if work logs match presences");
+            var filteredWorkLogEntries = (await FilterWorkLogEntries(null, from, to)).GroupBy(o => ParseDay(o.Date)).ToDictionary(g => g.Key, g => g.ToList());
+            var filteredPresenceEntries = (await FilterPresenceEntries(from, to)).GroupBy(o =>
+            {
+                var time = ParseTime(o.From);
+                var day = new DateTime(time.Year, time.Month, time.Day);
+                return day;
+            }).ToDictionary(g => g.Key, g => g.ToList());
+            var dates = filteredPresenceEntries.Keys.Union(filteredWorkLogEntries.Keys).OrderBy(o => o).ToList();
+            foreach (var date in dates)
+            {
+                var totalPresence = 0m;
+                var totalLogged = 0m;
+                if (filteredWorkLogEntries.TryGetValue(date, out var workLogs))
+                {
+                    totalLogged += workLogs.Sum(workLog => workLog.Hours);
+                }
+
+                if (filteredPresenceEntries.TryGetValue(date, out var presences))
+                {
+                    foreach (var presence in presences)
+                    {
+                        var presenceFrom = ParseTime(presence.From);
+                        var presenceTo = ParseTime(presence.To);
+                        totalPresence += (decimal)(presenceTo - presenceFrom).TotalHours;
+                    }
+                }
+                // some minutes count result in rounding errors, let's try to fix this
+                totalPresence = Math.Round(totalPresence, 5);
+
+                if (totalPresence != totalLogged)
+                {
+                    Console.WriteLine($"- {date.Day:D2}.{date.Month:D2}.{date.Year:D4} : logged {totalLogged.ToString(CultureInfo.InvariantCulture)}h, presence {totalPresence.ToString(CultureInfo.InvariantCulture)}h");
+                }
+            }
+        }
+
+        public async Task ListWorkLogEntries(string textFilter, DateTime? from, DateTime? to)
+        {
+            var filteredEntries = await FilterWorkLogEntries(textFilter, from, to);
             foreach (var entry in filteredEntries)
             {
                 Console.WriteLine($"- {entry.Date} {(entry.Hours).ToString("N2", CultureInfo.InvariantCulture)}h {entry.Description}");
             }
         }
 
-        private string GetAggregationKey(VertecEntry entry)
+        private string GetAggregationKey(WorkLogEntry entry)
         {
             // default to project name
             if (this._configuration.VertecAggregationConfig == null)
@@ -553,7 +305,7 @@
 
         public async Task Aggregate(string textFilter, DateTime? from, DateTime? to)
         {
-            var filteredEntries = await FilterEntries(textFilter, from, to);
+            var filteredEntries = await FilterWorkLogEntries(textFilter, from, to);
             var totalAmount = 0m;
             var amountPerProject = new Dictionary<string, decimal>();
             filteredEntries.ForEach(entry =>
@@ -611,11 +363,26 @@
                 throw new Exception($"{s} is not in the yyyy-MM-dd or dd.MM.yyyy format");
             }
         }
+        
+        public static DateTime ParseTime(string s) // 2021-02-04T13:41:00
+        {
+            var regex = new Regex(@"(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})");
+            var match = regex.Match(s);
+            if (match.Success)
+            {
+                var date = match.Groups.Values.Skip(1).Select(g => g.Value).Select(int.Parse).ToArray();
+                return new DateTime(date[0], date[1], date[2], date[3], date[4], date[5]);
+            }
+            else
+            {
+                throw new Exception($"{s} is not in the yyyy-MM-ddThh:mm:ss format");
+            }
+        }
 
         private async Task<HashSet<string>> GetHolidayTestHashSet()
         {
             var result = new HashSet<string>();
-            foreach (var holiday in await LoadHolidayCache())
+            foreach (var holiday in await _holidayEntryCacheManager.GetData())
             {
                 if (holiday.FromDate == holiday.ToDate)
                 {
@@ -640,9 +407,9 @@
 
         public async Task Overtime(DateTime? atDateTime)
         {
-            var filteredEntries = await FilterEntries(null, null, null);
+            var filteredEntries = await FilterWorkLogEntries(null, null, null);
             var holidayTestHashSet = await GetHolidayTestHashSet();
-            var firstWorkDay = ParseDay(await GetUserFirstWorkDay());
+            var firstWorkDay = ParseDay((await _userInfoCacheManager.GetData()).FirstWorkDay);
             var end = atDateTime ?? DateTime.Today;
             var totalAmount = 0m;
             var expectedAmount = 0m;

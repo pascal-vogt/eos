@@ -65,3 +65,8 @@ You can view your overtime:
 eos vertec --overtime
 eos vertec --overtime-at 01.01.2021
 ```
+
+You can check if the presence matches the work logs:
+```
+eos vertec --check-presence --from 01.01.2020
+```

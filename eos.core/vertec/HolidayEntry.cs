@@ -1,6 +1,6 @@
 ﻿namespace eos.core.vertec
 {
-    public class Holiday
+    public class HolidayEntry
     {
         public string Name { get; set; }
         

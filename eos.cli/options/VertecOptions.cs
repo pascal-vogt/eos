@@ -31,5 +31,8 @@
         
         [Option("overtime-at", HelpText = "Compute overtime at a specified day")]
         public string OvertimeAt { get; set; }
+        
+        [Option("check-presence", HelpText = "Check if the presence matches the logged hours")]
+        public bool CheckPresence { get; set; }
     }
 }

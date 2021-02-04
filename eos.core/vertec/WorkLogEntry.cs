@@ -1,6 +1,6 @@
 ﻿namespace eos.core.vertec
 {
-    public class VertecEntry
+    public class WorkLogEntry
     {
         public string Project { get; set; }
         public string Phase { get; set; }

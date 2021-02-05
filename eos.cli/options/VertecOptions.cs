@@ -20,6 +20,12 @@
         [Option( "to", HelpText = "Upper bound filter for the date in the dd.MM.yyyy or yyyy-MM-dd format")]
         public string To { get; set; }
         
+        [Option("today", HelpText = "Like --from, --to for today's day")]
+        public bool Today { get; set; }
+        
+        [Option("current-month", HelpText = "Like --from, --to for the current month (partial, until today)")]
+        public bool CurrentMonth { get; set; }
+
         [Option("list", HelpText = "List items from the vertec cache (can be filtered)")]
         public bool List { get; set; }
         

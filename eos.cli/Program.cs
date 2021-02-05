@@ -61,6 +61,19 @@
             {
                 to = VertecInterface.ParseDay(o.To);
             }
+
+            if (o.Today)
+            {
+                from = DateTime.Today;
+                to = DateTime.Today;
+            }
+            
+            if (o.CurrentMonth)
+            {
+                var today = DateTime.Today;
+                from = new DateTime(today.Year, today.Month, 1);
+                to = today;
+            }
             
             if (o.InitCache)
             {

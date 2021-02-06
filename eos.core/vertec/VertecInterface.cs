@@ -184,11 +184,12 @@
             }).ToList();
         }
 
-        private async Task<List<WorkLogEntry>> FilterWorkLogEntries(string textFilter, DateTime? from, DateTime? to)
+        private async Task<List<WorkLogEntry>> FilterWorkLogEntries(string textFilter, string regexFilter, DateTime? from, DateTime? to)
         {
             var unfiltered = await LoadWorkLogCacheInRange(from, to);
             var fromFormatted = FormatDay(from);
             var toFormatted = FormatDay(to);
+            var compiledRegexFilter = regexFilter != null ? new Regex(regexFilter, RegexOptions.Compiled) : null;
             
             return unfiltered.Where(entry =>
             {
@@ -211,6 +212,15 @@
                     }
                 }
 
+                if (compiledRegexFilter != null)
+                {
+                    if (!compiledRegexFilter.IsMatch(entry.Description) && !compiledRegexFilter.IsMatch(entry.Project) &&
+                        !compiledRegexFilter.IsMatch(entry.Phase))
+                    {
+                        return false;
+                    }
+                }
+
                 return true;
             }).ToList();
         }
@@ -218,7 +228,7 @@
         public async Task CheckPresence(DateTime? from, DateTime? to)
         {
             Console.WriteLine("Checking if work logs match presences");
-            var filteredWorkLogEntries = (await FilterWorkLogEntries(null, from, to)).GroupBy(o => ParseDay(o.Date)).ToDictionary(g => g.Key, g => g.ToList());
+            var filteredWorkLogEntries = (await FilterWorkLogEntries(null, null, from, to)).GroupBy(o => ParseDay(o.Date)).ToDictionary(g => g.Key, g => g.ToList());
             var filteredPresenceEntries = (await FilterPresenceEntries(from, to)).GroupBy(o =>
             {
                 var time = ParseTime(o.From);
@@ -254,9 +264,9 @@
             }
         }
 
-        public async Task ListWorkLogEntries(string textFilter, DateTime? from, DateTime? to)
+        public async Task ListWorkLogEntries(string textFilter, string regexFilter, DateTime? from, DateTime? to)
         {
-            var filteredEntries = await FilterWorkLogEntries(textFilter, from, to);
+            var filteredEntries = await FilterWorkLogEntries(textFilter, regexFilter, from, to);
             foreach (var entry in filteredEntries)
             {
                 Console.WriteLine($"- {entry.Date} {(entry.Hours).ToString("N2", CultureInfo.InvariantCulture)}h {entry.Description}");
@@ -303,9 +313,9 @@
             return "?";
         }
 
-        public async Task Aggregate(string textFilter, DateTime? from, DateTime? to)
+        public async Task Aggregate(string textFilter, string regexFilter, DateTime? from, DateTime? to)
         {
-            var filteredEntries = await FilterWorkLogEntries(textFilter, from, to);
+            var filteredEntries = await FilterWorkLogEntries(textFilter, regexFilter, from, to);
             var totalAmount = 0m;
             var amountPerProject = new Dictionary<string, decimal>();
             filteredEntries.ForEach(entry =>
@@ -407,7 +417,7 @@
 
         public async Task Overtime(DateTime? atDateTime)
         {
-            var filteredEntries = await FilterWorkLogEntries(null, null, null);
+            var filteredEntries = await FilterWorkLogEntries(null, null, null, null);
             var holidayTestHashSet = await GetHolidayTestHashSet();
             var firstWorkDay = ParseDay((await _userInfoCacheManager.GetData()).FirstWorkDay);
             var end = atDateTime ?? DateTime.Today;

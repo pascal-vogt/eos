@@ -14,6 +14,9 @@
         [Option( "text", HelpText = "Text filter")]
         public string Text { get; set; }
         
+        [Option( "regex", HelpText = "Regex filter")]
+        public string Regex { get; set; }
+        
         [Option( "from", HelpText = "Lower bound filter for the date in the dd.MM.yyyy or yyyy-MM-dd format")]
         public string From { get; set; }
         

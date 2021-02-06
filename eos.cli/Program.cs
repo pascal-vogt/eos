@@ -1,6 +1,7 @@
 ﻿namespace eos.cli
 {
     using System;
+    using System.Text.RegularExpressions;
     using System.Threading.Tasks;
     using CommandLine;
     using core.configuration;
@@ -87,11 +88,11 @@
             }
             else if (o.List)
             {
-                await vertec.ListWorkLogEntries(o.Text, from, to);
+                await vertec.ListWorkLogEntries(o.Text, o.Regex, from, to);
             }
             else if (o.Aggregate)
             {
-                await vertec.Aggregate(o.Text, from, to);
+                await vertec.Aggregate(o.Text, o.Regex, from, to);
             }
             else if (o.Overtime)
             {

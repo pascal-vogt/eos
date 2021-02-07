@@ -16,6 +16,13 @@
         public string Replacement { get; set; }
     }
 
+    public class ServiceAlias
+    {
+        public string Name { get; set; }
+        
+        public string Alias { get; set; }
+    }
+
     public class Configuration
     {
         public string VertecURL { get; set; }
@@ -25,6 +32,8 @@
         public string VertecCacheLocation { get; set; }
         
         public List<VertecAggregationConfigItem> VertecAggregationConfig { get; set; }
+        
+        public List<ServiceAlias> ServiceAliases { get; set; }
 
         public static string GetConfigFilePath()
         {
@@ -50,7 +59,7 @@
             });
             var path = GetConfigFilePath();
             await File.WriteAllTextAsync(path, text, Encoding.UTF8);
-            Console.WriteLine($"Initialized {path}");
+            Console.WriteLine($"Saved {path}");
         }
     }
 }

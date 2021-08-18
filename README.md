@@ -70,3 +70,22 @@ You can check if the presence matches the work logs:
 ```
 eos vertec --check-presence --from 01.01.2020
 ```
+
+## DB
+
+Primarily meant to export realistic test data from a real database.
+
+You will have to run the command at least twice. On the first run a
+profile will be generated that you will have to edit. Basically you
+need to specify which table is the entry point, which other tables 
+you want to export as well and what direction the foreign keys have
+to be followed in.
+```
+eos db -c "Server=.; Database=someDb;Trusted_Connection=True;" --export-to data.sql --profile profile.json --id 02cd75a5-bb2c-4211-b744-288f3a552529
+```
+
+Potential ideas for future improvements include
+
+- Inferring trivial exploration directions for foreign keys (would work for some but not all)
+- Adding support for identity insert
+- Adding support for other databases than MSSQL

@@ -1,11 +1,11 @@
 ﻿namespace eos.cli
 {
     using System;
-    using System.ServiceProcess;
-    using System.Text.RegularExpressions;
+    using System.IO;
     using System.Threading.Tasks;
     using CommandLine;
     using core.configuration;
+    using core.database;
     using core.services;
     using eos.core.vertec;
     using options;
@@ -14,7 +14,7 @@
     {
         static async Task Main(string[] args)
         {
-            await Parser.Default.ParseArguments<VertecOptions, ConfigOptions, ServicesOptions>(args)
+            await Parser.Default.ParseArguments<VertecOptions, ConfigOptions, ServicesOptions, DatabaseOptions>(args)
                 .WithParsedAsync(ProcessOptions);
         }
         
@@ -31,6 +31,25 @@
                 case ServicesOptions servicesOptions:
                     await ProcessServiceOptions(servicesOptions);
                     break;
+                case DatabaseOptions databaseOptions:
+                    await ProcessDatabaseOptions(databaseOptions);
+                    break;
+            }
+        }
+
+        private static async Task ProcessDatabaseOptions(DatabaseOptions o)
+        {
+            if (o.ExportTo != null && o.Profile != null && o.Id != null && o.ConnectionString != null)
+            {
+                var databaseService = new DatabaseService
+                {
+                    ConnectionString = o.ConnectionString
+                };
+                await databaseService.Export(o.ExportTo, o.Profile, o.Id, o.DummyFiles);
+            }
+            else
+            {
+                Console.WriteLine("The following options all need to have a value: --connection-string, --profile, --export-to, --id");
             }
         }
 

@@ -11,7 +11,7 @@
 
     public class PresenceCacheManager: VertecCacheManager<PresenceCacheKey, List<Presence>>
     {
-        private static readonly Regex FileNameRegex = new Regex("presence-([0-9]{4})-([0-9]{2}).json");
+        private static readonly Regex FileNameRegex = new("presence-([0-9]{4})-([0-9]{2}).json");
         private readonly VertecRequestsManager _vertecRequestsManager;
         
         public PresenceCacheManager(Configuration configuration, VertecRequestsManager vertecRequestsManager) : base(configuration, "presence")
@@ -73,23 +73,21 @@
                 Members = new[]
                 {
                     "von",
-                    "bis"
+                    "bis",
+                    "text"
                 },
-                Expressions = new KeyValuePair<string, string>[]
-                {
-                }
+                Expressions = Array.Empty<KeyValuePair<string, string>>()
             };
             var xmlDoc = await this._vertecRequestsManager.Execute(request);
 
             var entries = new List<Presence>();
-            foreach (XmlElement leistung in xmlDoc.DocumentElement.ChildNodes[0].ChildNodes[0].ChildNodes)
+            foreach (XmlElement presenceElement in xmlDoc.DocumentElement.ChildNodes[0].ChildNodes[0].ChildNodes)
             {
                 var entry = new Presence();
                 entries.Add(entry);
-                foreach (XmlNode node in leistung.ChildNodes)
+                foreach (XmlNode node in presenceElement.ChildNodes)
                 {
-                    var propertyTag = node as XmlElement;
-                    if (propertyTag == null)
+                    if (node is not XmlElement propertyTag)
                     {
                         continue;
                     }
@@ -101,6 +99,9 @@
                             break;
                         case "bis":
                             entry.To = propertyTag.InnerText; // yyyy-MM-dd format
+                            break;
+                        case "text":
+                            entry.Text = propertyTag.InnerText;
                             break;
                     }
                 }

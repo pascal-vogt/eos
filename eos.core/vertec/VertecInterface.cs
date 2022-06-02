@@ -162,11 +162,12 @@
             return dateTime.HasValue ? $"{dateTime.Value.Year:D4}-{dateTime.Value.Month:D2}-{dateTime.Value.Day:D2}" : null;
         }
         
-        private async Task<List<Presence>> FilterPresenceEntries(DateTime? from, DateTime? to)
+        private async Task<List<Presence>> FilterPresenceEntries(string textFilter, string regexFilter, DateTime? from, DateTime? to)
         {
             var unfiltered = await LoadPresenceCacheInRange(from, to);
             var fromFormatted = FormatDay(from);
             var toFormatted = FormatDay(to);
+            var compiledRegexFilter = regexFilter != null ? new Regex(regexFilter, RegexOptions.Compiled) : null;
             
             return unfiltered.Where(entry =>
             {
@@ -178,6 +179,22 @@
                 if (toFormatted != null && string.Compare(toFormatted, entry.From, StringComparison.InvariantCulture) < 0)
                 {
                     return false;
+                }
+                
+                if (textFilter != null)
+                {
+                    if (entry.Text.IndexOf(textFilter, StringComparison.InvariantCulture) == -1)
+                    {
+                        return false;
+                    }
+                }
+
+                if (compiledRegexFilter != null)
+                {
+                    if (!compiledRegexFilter.IsMatch(entry.Text))
+                    {
+                        return false;
+                    }
                 }
 
                 return true;
@@ -229,7 +246,7 @@
         {
             Console.WriteLine("Checking if work logs match presences");
             var filteredWorkLogEntries = (await FilterWorkLogEntries(null, null, from, to)).GroupBy(o => ParseDay(o.Date)).ToDictionary(g => g.Key, g => g.ToList());
-            var filteredPresenceEntries = (await FilterPresenceEntries(from, to)).GroupBy(o =>
+            var filteredPresenceEntries = (await FilterPresenceEntries(null, null, from, to)).GroupBy(o =>
             {
                 var time = ParseTime(o.From);
                 var day = new DateTime(time.Year, time.Month, time.Day);
@@ -270,6 +287,15 @@
             foreach (var entry in filteredEntries)
             {
                 Console.WriteLine($"- {entry.Date} {(entry.Hours).ToString("N2", CultureInfo.InvariantCulture)}h {entry.Description}");
+            }
+        }
+
+        public async Task ListPresenceEntries(string textFilter, string regexFilter, DateTime? from, DateTime? to)
+        {
+            var filteredEntries = await FilterPresenceEntries(textFilter, regexFilter, from, to);
+            foreach (var entry in filteredEntries)
+            {
+                Console.WriteLine($"- {entry.From} - {entry.To}: {entry.Text}");
             }
         }
 
@@ -334,6 +360,19 @@
                 Console.WriteLine($"- {hous.ToString("N2", CultureInfo.InvariantCulture).PadLeft(7)}h {project}");                
             }
             Console.WriteLine($"\nTotal: {totalAmount.ToString("N2", CultureInfo.InvariantCulture)}h");
+        }
+
+        public async Task AggregatePresence(string textFilter, string regexFilter, DateTime? from, DateTime? to)
+        {
+            var filteredEntries = await FilterPresenceEntries(textFilter, regexFilter, from, to);
+            var totalPresence = 0m;
+            filteredEntries.ForEach(presence =>
+            {
+                var presenceFrom = ParseTime(presence.From);
+                var presenceTo = ParseTime(presence.To);
+                totalPresence += (decimal)(presenceTo - presenceFrom).TotalHours;
+            });
+            Console.WriteLine($"Total: {totalPresence.ToString("N2", CultureInfo.InvariantCulture)}h");
         }
         
         public static void ParseMonth(string s, out int year, out int month)

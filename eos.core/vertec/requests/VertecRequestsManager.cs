@@ -87,7 +87,7 @@
             {
                 xmlDoc.Load(new MemoryStream(Encoding.UTF8.GetBytes(xmlOut)));
             }
-            catch (Exception e)
+            catch (Exception)
             {
                 Console.WriteLine(xmlOut);
                 throw;

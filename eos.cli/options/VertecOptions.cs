@@ -32,8 +32,14 @@
         [Option("list", HelpText = "List items from the vertec cache (can be filtered)")]
         public bool List { get; set; }
         
+        [Option("list-presence", HelpText = "List presence from the vertec cache (can be filtered)")]
+        public bool ListPresence { get; set; }
+        
         [Option("aggregate", HelpText = "List items from the vertec cache (can be filtered)")]
         public bool Aggregate { get; set; }
+        
+        [Option("aggregate-presence", HelpText = "List presence from the vertec cache (can be filtered)")]
+        public bool AggregatePresence { get; set; }
         
         [Option("overtime", HelpText = "Compute current overtime")]
         public bool Overtime { get; set; }

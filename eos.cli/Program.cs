@@ -1,13 +1,12 @@
 ﻿namespace eos.cli
 {
     using System;
-    using System.IO;
     using System.Threading.Tasks;
     using CommandLine;
     using core.configuration;
     using core.database;
     using core.services;
-    using eos.core.vertec;
+    using core.vertec;
     using options;
 
     class Program
@@ -156,9 +155,17 @@
             {
                 await vertec.ListWorkLogEntries(o.Text, o.Regex, from, to);
             }
+            else if (o.ListPresence)
+            {
+                await vertec.ListPresenceEntries(o.Text, o.Regex, from, to);
+            }
             else if (o.Aggregate)
             {
                 await vertec.Aggregate(o.Text, o.Regex, from, to);
+            }
+            else if (o.AggregatePresence)
+            {
+                await vertec.AggregatePresence(o.Text, o.Regex, from, to);
             }
             else if (o.Overtime)
             {

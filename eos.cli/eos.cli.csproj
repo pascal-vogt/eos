@@ -2,20 +2,23 @@
 
     <PropertyGroup>
         <OutputType>Exe</OutputType>
-        <TargetFramework>net6.0</TargetFramework>
+        <TargetFramework>net8.0</TargetFramework>
         <Product>eos.cli</Product>
         <AssemblyName>eos</AssemblyName>
         <Company>Pascal Vogt</Company>
+        <Nullable>enable</Nullable>
     </PropertyGroup>
 
     <ItemGroup>
       <ProjectReference Include="..\eos.core\eos.core.csproj" />
+      <ProjectReference Include="..\eos.database\eos.database.csproj" />
+      <ProjectReference Include="..\eos.vertec\eos.vertec.csproj" />
     </ItemGroup>
 
     <ItemGroup>
-      <PackageReference Include="CommandLineParser" Version="2.9.0-preview1" />
-      <PackageReference Include="System.Data.SqlClient" Version="4.8.3" />
-      <PackageReference Include="System.ServiceProcess.ServiceController" Version="6.0.0" />
+      <PackageReference Include="CommandLineParser" Version="2.9.1" />
+      <PackageReference Include="System.Data.SqlClient" Version="4.9.0" />
+      <PackageReference Include="System.ServiceProcess.ServiceController" Version="9.0.1" />
     </ItemGroup>
 
 </Project>

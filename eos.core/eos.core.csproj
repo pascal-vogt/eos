@@ -1,13 +1,23 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
     <PropertyGroup>
-        <TargetFramework>net6.0</TargetFramework>
+        <TargetFramework>net8.0</TargetFramework>
+        <LangVersion>12</LangVersion>
+        <Nullable>enable</Nullable>
     </PropertyGroup>
 
     <ItemGroup>
-      <PackageReference Include="CommandLineParser" Version="2.9.0-preview1" />
-      <PackageReference Include="System.Data.SqlClient" Version="4.8.3" />
-      <PackageReference Include="System.ServiceProcess.ServiceController" Version="6.0.0" />
+      <PackageReference Include="CommandLineParser" Version="2.9.1" />
+      <PackageReference Include="ScottPlot" Version="5.0.54" />
+      <PackageReference Include="Swashbuckle.AspNetCore" Version="7.2.0" />
+      <PackageReference Include="Swashbuckle.AspNetCore.Annotations" Version="7.2.0" />
+      <PackageReference Include="System.Data.SqlClient" Version="4.9.0" />
+      <PackageReference Include="System.ServiceProcess.ServiceController" Version="9.0.1" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <ProjectReference Include="..\eos.jira.openapi\eos.jira.openapi.csproj" />
+      <ProjectReference Include="..\eos.kompass.openapi\eos.kompass.openapi.csproj" />
     </ItemGroup>
 
 </Project>

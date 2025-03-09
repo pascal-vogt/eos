@@ -4,6 +4,10 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "eos.cli", "eos.cli\eos.cli.
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "eos.core", "eos.core\eos.core.csproj", "{9A73105F-725C-45E0-87E6-59A5000B263E}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "eos.vertec", "eos.vertec\eos.vertec.csproj", "{D8B735E7-2F87-4E83-9EE7-2CA246EC03F8}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "eos.database", "eos.database\eos.database.csproj", "{2D806515-F4BD-462D-8B26-45C43458BBCE}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -18,5 +22,13 @@ Global
 		{9A73105F-725C-45E0-87E6-59A5000B263E}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{9A73105F-725C-45E0-87E6-59A5000B263E}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{9A73105F-725C-45E0-87E6-59A5000B263E}.Release|Any CPU.Build.0 = Release|Any CPU
+		{D8B735E7-2F87-4E83-9EE7-2CA246EC03F8}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{D8B735E7-2F87-4E83-9EE7-2CA246EC03F8}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{D8B735E7-2F87-4E83-9EE7-2CA246EC03F8}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{D8B735E7-2F87-4E83-9EE7-2CA246EC03F8}.Release|Any CPU.Build.0 = Release|Any CPU
+		{2D806515-F4BD-462D-8B26-45C43458BBCE}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{2D806515-F4BD-462D-8B26-45C43458BBCE}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{2D806515-F4BD-462D-8B26-45C43458BBCE}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{2D806515-F4BD-462D-8B26-45C43458BBCE}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 EndGlobal

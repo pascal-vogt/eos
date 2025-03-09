@@ -1,3 +1,4 @@
-.idea
-bin
-obj
+/.idea/
+bin/
+obj/
+/.config/dotnet-tools.json

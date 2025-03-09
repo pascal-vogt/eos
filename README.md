@@ -4,7 +4,7 @@ This is just a bunch of command line functionalities that are useful to me, and 
 
 This is how I build it (you might have to select different options depending on your OS):
 ```
-dotnet publish --framework netcoreapp3.1 --output C:/data/tools/eos --runtime win-x64 --self-contained true
+dotnet publish --framework net8.0 --output C:/data/repo/tools/eos --runtime win-x64 --self-contained true
 ```
 
 ## Config
@@ -40,7 +40,7 @@ eos vertec --aggregate --from 10.01.2021
 The default aggregation key is the project name, but it can be changed using `eos.config`:
 ```
 {
-  "VertecAggregationConfig": [
+  "AggregationConfig": [
     {
       "Key": "Project,Phase,Description",
       "Match": "^.*(EOS |EOS-).*$",
@@ -77,7 +77,7 @@ Primarily meant to export realistic test data from a real database.
 
 You will have to run the command at least twice. On the first run a
 profile will be generated that you will have to edit. Basically you
-need to specify which table is the entry point, which other tables 
+need to specify which table is the entry point, which other tables
 you want to export as well and what direction the foreign keys have
 to be followed in.
 ```
